@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/newsletter/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/newsletter/:path*",
+      "destination": "/:path*"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:4173';
+const IS_LOCAL = ['127.0.0.1', 'localhost'].includes(new URL(BASE_URL).hostname);
 
 test('원고 자동 편집, 고정, 짧은 공유 링크, 편집, 삭제 흐름', async ({ page, context }) => {
   if (new URL(BASE_URL).hostname === '127.0.0.1' || new URL(BASE_URL).hostname === 'localhost') {
@@ -48,7 +49,9 @@ test('원고 자동 편집, 고정, 짧은 공유 링크, 편집, 삭제 흐름'
   expect(Math.abs(desktopImage.ratio - desktopImage.naturalRatio)).toBeLessThan(0.02);
   expect(desktopImage.imageWidth).toBeLessThan(desktopImage.frameWidth);
   const shareUrl = await page.evaluate(() => navigator.clipboard.readText());
-  expect(shareUrl).toContain('?id=');
+  const parsedShareUrl = new URL(shareUrl);
+  expect(parsedShareUrl.pathname).toMatch(/^\/newsletter\/s\/[A-Za-z0-9_-]{8}$/);
+  expect(parsedShareUrl.origin).toBe(IS_LOCAL ? new URL(BASE_URL).origin : 'https://homong-app.com');
   expect(shareUrl.length).toBeLessThan(100);
   await page.getByRole('button', { name: '닫기' }).click();
   await expect(page.locator('.card')).toHaveCount(1);
@@ -63,9 +66,16 @@ test('원고 자동 편집, 고정, 짧은 공유 링크, 편집, 삭제 흐름'
 
   const sharedPage = await context.newPage();
   await sharedPage.setViewportSize({ width: 390, height: 844 });
-  await sharedPage.goto(shareUrl);
+  const readerUrl = IS_LOCAL ? `${BASE_URL}/?id=${parsedShareUrl.pathname.split('/').pop()}` : shareUrl;
+  await sharedPage.goto(readerUrl);
   await expect(sharedPage.getByRole('heading', { name: 'AI 시대의 리더십' })).toBeVisible();
   await expect(sharedPage.locator('.story-gallery img')).toHaveCount(3);
+  if (!IS_LOCAL) {
+    await expect(sharedPage.locator('.topbar')).toHaveCount(0);
+    await expect(sharedPage.locator('#editorDialog')).toHaveCount(0);
+    await expect(sharedPage.locator('#newsletterGrid')).toHaveCount(0);
+    await expect(sharedPage.getByRole('button', { name: /자동 뉴스레터 만들기/ })).toHaveCount(0);
+  }
   const mobileBounds = await sharedPage.locator('.reader-hero img').boundingBox();
   expect(mobileBounds.x).toBeGreaterThan(0);
   expect(mobileBounds.x + mobileBounds.width).toBeLessThanOrEqual(390);
