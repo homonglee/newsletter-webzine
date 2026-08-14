@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 
+const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:4173';
+
 test('작성, 고정, 공유 링크, 편집, 삭제 흐름', async ({ page, context }) => {
-  await page.goto('http://127.0.0.1:4173');
+  await page.goto(BASE_URL);
   await expect(page.getByRole('heading', { name: /한 장의 사진/ })).toBeVisible();
   await page.getByRole('button', { name: /첫 뉴스레터 만들기/ }).click();
   await page.locator('#titleInput').fill('AI 시대의 리더십');
