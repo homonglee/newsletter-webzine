@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "check": "node --check public/app.js && node --check public/core.js",
+    "check": "node --check public/app.js && node --check public/core.js && node --check public/reader.js && node --check api/letters.js && node --check api/reader.js && node --check api/image.js && node --check lib/share-store.js",
     "dev": "npx serve public -l 4173"
   },
   "devDependencies": {

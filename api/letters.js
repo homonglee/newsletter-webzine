@@ -1,34 +1,14 @@
 import { randomBytes } from 'node:crypto';
+import { ID_PATTERN, redis } from '../lib/share-store.js';
 
 const MAX_BODY_BYTES = 4_000_000;
 const MAX_IMAGES = 8;
 const TTL_SECONDS = 60 * 60 * 24 * 365;
-const ID_PATTERN = /^[A-Za-z0-9_-]{8}$/;
 
 function send(res, status, body) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   return res.status(status).json(body);
-}
-
-function redisConfig() {
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) throw new Error('공유 저장소가 연결되지 않았습니다.');
-  return { url, token };
-}
-
-async function redis(command) {
-  const { url, token } = redisConfig();
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(command),
-  });
-  if (!response.ok) throw new Error(`저장소 응답 오류: ${response.status}`);
-  const data = await response.json();
-  if (data.error) throw new Error(data.error);
-  return data.result;
 }
 
 function sanitizeLetter(value) {

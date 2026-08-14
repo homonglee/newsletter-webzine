@@ -79,6 +79,14 @@ test('원고 자동 편집, 고정, 짧은 공유 링크, 편집, 삭제 흐름'
     await expect(sharedPage.locator('#editorDialog')).toHaveCount(0);
     await expect(sharedPage.locator('#newsletterGrid')).toHaveCount(0);
     await expect(sharedPage.getByRole('button', { name: /자동 뉴스레터 만들기/ })).toHaveCount(0);
+    await expect(sharedPage.locator('meta[property="og:title"]')).toHaveAttribute('content', 'AI 시대의 리더십');
+    await expect(sharedPage.locator('meta[property="og:description"]')).toHaveAttribute('content', '변화를 이끄는 리더의 세 가지 질문을 소개합니다.');
+    const ogImage = await sharedPage.locator('meta[property="og:image"]').getAttribute('content');
+    expect(ogImage).toMatch(/^https:\/\/homong-app\.com\/newsletter\/og\/[A-Za-z0-9_-]{8}$/);
+    const thumbnail = await sharedPage.request.get(ogImage);
+    expect(thumbnail.ok()).toBe(true);
+    expect(thumbnail.headers()['content-type']).toMatch(/^image\//);
+    expect((await thumbnail.body()).length).toBeGreaterThan(0);
   }
   const mobileLayout = await sharedPage.locator('.reader-hero img').evaluate((img) => {
     const image = img.getBoundingClientRect();
