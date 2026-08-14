@@ -9,6 +9,8 @@ import {
   removeNewsletter,
   autoCompose,
   normalizeManuscript,
+  formatTextAsMarkdown,
+  renderMarkdown,
 } from '../public/core.js';
 
 test('뉴스레터를 생성하고 공유 문자열로 왕복 복원한다', async () => {
@@ -61,4 +63,27 @@ test('여러 이미지와 자동 레이아웃 정보를 뉴스레터에 보존�
   assert.deepEqual(item.images, ['one', 'two']);
   assert.equal(item.image, 'one');
   assert.equal(item.layout, 'editorial');
+});
+
+test('일반 TXT의 짧은 행과 열거 문장을 Markdown 구조로 바꾼다', () => {
+  const md = formatTextAsMarkdown('변화의 시작\n\n조직은 질문하는 방식을 바꿔야 합니다.\n\n첫째, 반복 업무를 찾습니다.\n둘째, 판단 기준을 세웁니다.');
+  assert.match(md, /^## 변화의 시작/);
+  assert.match(md, /- 첫째, 반복 업무를 찾습니다\./);
+  assert.match(md, /- 둘째, 판단 기준을 세웁니다\./);
+});
+
+test('일반 TXT와 Markdown 인용문이 섞여도 소제목과 목록을 자동 변환한다', () => {
+  const md = formatTextAsMarkdown('핵심 질문\n\n첫째, 질문합니다.\n둘째, 검증합니다.\n\n> 좋은 질문이 변화를 만듭니다.');
+  assert.match(md, /^## 핵심 질문/);
+  assert.match(md, /- 첫째, 질문합니다\./);
+  assert.match(md, /> 좋은 질문이 변화를 만듭니다\./);
+});
+
+test('Markdown을 안전한 웹진 HTML로 렌더링한다', () => {
+  const html = renderMarkdown('## 핵심 변화\n\n중요한 **질문**입니다.\n\n- 첫 번째\n- 두 번째\n\n<script>alert(1)</script>');
+  assert.match(html, /<h2>핵심 변화<\/h2>/);
+  assert.match(html, /<strong>질문<\/strong>/);
+  assert.match(html, /<ul><li>첫 번째<\/li><li>두 번째<\/li><\/ul>/);
+  assert.doesNotMatch(html, /<script>/);
+  assert.match(html, /&lt;script&gt;/);
 });
