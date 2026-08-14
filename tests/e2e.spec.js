@@ -2,7 +2,21 @@ import { test, expect } from '@playwright/test';
 
 const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:4173';
 
-test('원고 자동 편집, 고정, 공유 링크, 편집, 삭제 흐름', async ({ page, context }) => {
+test('원고 자동 편집, 고정, 짧은 공유 링크, 편집, 삭제 흐름', async ({ page, context }) => {
+  if (new URL(BASE_URL).hostname === '127.0.0.1' || new URL(BASE_URL).hostname === 'localhost') {
+    const sharedLetters = new Map();
+    await context.route('**/api/letters*', async (route) => {
+      const request = route.request();
+      if (request.method() === 'POST') {
+        const id = 'TestAb12';
+        sharedLetters.set(id, request.postDataJSON());
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id }) });
+      }
+      const id = new URL(request.url()).searchParams.get('id');
+      const letter = sharedLetters.get(id);
+      return route.fulfill({ status: letter ? 200 : 404, contentType: 'application/json', body: JSON.stringify(letter ? { letter } : { error: '찾을 수 없습니다.' }) });
+    });
+  }
   await page.goto(BASE_URL);
   await expect(page.getByRole('heading', { name: /원고와 사진만 넣으세요/ })).toBeVisible();
   await page.getByRole('button', { name: /자동 뉴스레터 만들기/ }).click();
@@ -34,7 +48,8 @@ test('원고 자동 편집, 고정, 공유 링크, 편집, 삭제 흐름', async
   expect(Math.abs(desktopImage.ratio - desktopImage.naturalRatio)).toBeLessThan(0.02);
   expect(desktopImage.imageWidth).toBeLessThan(desktopImage.frameWidth);
   const shareUrl = await page.evaluate(() => navigator.clipboard.readText());
-  expect(shareUrl).toContain('?letter=');
+  expect(shareUrl).toContain('?id=');
+  expect(shareUrl.length).toBeLessThan(100);
   await page.getByRole('button', { name: '닫기' }).click();
   await expect(page.locator('.card')).toHaveCount(1);
   await expect(page.locator('.card .pin')).toContainText('IMPORTANT');
