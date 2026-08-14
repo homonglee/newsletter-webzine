@@ -44,10 +44,14 @@ test('원고 자동 편집, 고정, 짧은 공유 링크, 편집, 삭제 흐름'
   const desktopImage = await page.locator('.reader-hero img').evaluate((img) => {
     const box = img.getBoundingClientRect();
     const frame = img.closest('.reader-hero').getBoundingClientRect();
-    return { ratio: box.width / box.height, naturalRatio: img.naturalWidth / img.naturalHeight, frameWidth: frame.width, imageWidth: box.width };
+    const body = document.querySelector('.reader-copy .body').getBoundingClientRect();
+    return { ratio: box.width / box.height, naturalRatio: img.naturalWidth / img.naturalHeight, frameWidth: frame.width, imageWidth: box.width, imageX: box.x, bodyWidth: body.width, bodyX: body.x };
   });
   expect(Math.abs(desktopImage.ratio - desktopImage.naturalRatio)).toBeLessThan(0.02);
   expect(desktopImage.imageWidth).toBeLessThan(desktopImage.frameWidth);
+  expect(Math.abs(desktopImage.imageWidth - desktopImage.bodyWidth)).toBeLessThan(1);
+  expect(Math.abs(desktopImage.imageX - desktopImage.bodyX)).toBeLessThan(1);
+  console.log(`desktop-layout image=${desktopImage.imageWidth.toFixed(2)}px body=${desktopImage.bodyWidth.toFixed(2)}px x=${desktopImage.imageX.toFixed(2)}/${desktopImage.bodyX.toFixed(2)}`);
   const shareUrl = await page.evaluate(() => navigator.clipboard.readText());
   const parsedShareUrl = new URL(shareUrl);
   expect(parsedShareUrl.pathname).toMatch(/^\/newsletter\/s\/[A-Za-z0-9_-]{8}$/);
@@ -76,7 +80,14 @@ test('원고 자동 편집, 고정, 짧은 공유 링크, 편집, 삭제 흐름'
     await expect(sharedPage.locator('#newsletterGrid')).toHaveCount(0);
     await expect(sharedPage.getByRole('button', { name: /자동 뉴스레터 만들기/ })).toHaveCount(0);
   }
-  const mobileBounds = await sharedPage.locator('.reader-hero img').boundingBox();
-  expect(mobileBounds.x).toBeGreaterThan(0);
-  expect(mobileBounds.x + mobileBounds.width).toBeLessThanOrEqual(390);
+  const mobileLayout = await sharedPage.locator('.reader-hero img').evaluate((img) => {
+    const image = img.getBoundingClientRect();
+    const body = document.querySelector('.reader-copy .body').getBoundingClientRect();
+    return { imageX: image.x, imageWidth: image.width, bodyX: body.x, bodyWidth: body.width };
+  });
+  expect(mobileLayout.imageX).toBeGreaterThan(0);
+  expect(mobileLayout.imageX + mobileLayout.imageWidth).toBeLessThanOrEqual(390);
+  expect(Math.abs(mobileLayout.imageWidth - mobileLayout.bodyWidth)).toBeLessThan(1);
+  expect(Math.abs(mobileLayout.imageX - mobileLayout.bodyX)).toBeLessThan(1);
+  console.log(`mobile-layout image=${mobileLayout.imageWidth.toFixed(2)}px body=${mobileLayout.bodyWidth.toFixed(2)}px x=${mobileLayout.imageX.toFixed(2)}/${mobileLayout.bodyX.toFixed(2)}`);
 });
