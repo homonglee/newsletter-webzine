@@ -72,19 +72,21 @@ export function renderMarkdown(value = '') {
   return html.join('');
 }
 
-export function autoCompose(raw) {
+export function autoCompose(raw, options = {}) {
   const manuscript = normalizeManuscript(raw);
   if (!manuscript) throw new Error('자동 편집할 글을 입력하거나 원고 파일을 첨부해 주세요.');
   const paragraphs = manuscript.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
   const lines = manuscript.split('\n').map((line) => line.trim()).filter(Boolean);
   const explicitTitle = lines[0]?.match(/^#{1,6}\s+.+/) || lines[0]?.match(/^(제목|title)\s*[:：]/i);
-  const firstBlockIsTitle = paragraphs[0]?.split('\n').length === 1 && lines[0]?.length <= 55 && !/[.!?。！？]$/.test(lines[0]);
+  const suppliedTitle = String(options.title || '').trim();
+  const suppliedSummary = String(options.summary || '').trim();
+  const firstBlockIsTitle = !suppliedTitle && paragraphs[0]?.split('\n').length === 1 && lines[0]?.length <= 55 && !/[.!?。！？]$/.test(lines[0]);
   const hasTitle = Boolean(explicitTitle || firstBlockIsTitle);
   const firstLine = cleanTitle(lines[0] || '새로운 이야기');
-  const title = shorten(firstLine.replace(/[.!?。]$/, ''), 55);
-  const bodyParagraphs = hasTitle ? paragraphs.slice(1) : paragraphs;
-  const summarySource = bodyParagraphs[0] || lines.slice(1).join(' ') || firstLine;
-  const contentParagraphs = bodyParagraphs.length > 1 ? bodyParagraphs.slice(1) : bodyParagraphs;
+  const title = shorten(suppliedTitle || firstLine.replace(/[.!?。]$/, ''), 55);
+  const bodyParagraphs = suppliedTitle ? paragraphs : (hasTitle ? paragraphs.slice(1) : paragraphs);
+  const summarySource = suppliedSummary || bodyParagraphs[0] || lines.slice(1).join(' ') || firstLine;
+  const contentParagraphs = suppliedSummary ? bodyParagraphs : (bodyParagraphs.length > 1 ? bodyParagraphs.slice(1) : bodyParagraphs);
   const plainContent = normalizeManuscript(contentParagraphs.join('\n\n')) || firstLine;
   const content = formatTextAsMarkdown(plainContent);
   return { title, summary: shorten(summarySource.replace(/[#*_>`-]/g, '').replace(/\n/g, ' '), 105), content };

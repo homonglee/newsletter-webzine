@@ -54,6 +54,16 @@ test('원고의 첫 제목과 문단을 분석해 제목과 소개를 자동 구
   assert.match(result.content, /첫째, 반복 업무/);
 });
 
+test('별도 제목과 첫 줄을 사용하면 본문 첫 블록을 제목으로 제거하지 않는다', () => {
+  const result = autoCompose('핵심 질문\n\n기술보다 중요한 것은 좋은 질문입니다.', {
+    title: '호몽의 News Letter',
+    summary: '오늘의 AI 인사이트입니다.',
+  });
+  assert.equal(result.title, '호몽의 News Letter');
+  assert.equal(result.summary, '오늘의 AI 인사이트입니다.');
+  assert.match(result.content, /^## 핵심 질문/);
+});
+
 test('제목 표시와 불필요한 공백을 정리한다', () => {
   assert.equal(normalizeManuscript('  제목: 새로운 시작  \n\n\n  첫 문단입니다.  '), '제목: 새로운 시작\n\n첫 문단입니다.');
 });
