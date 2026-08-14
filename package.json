@@ -1,0 +1,14 @@
+{
+  "name": "newsletter-webzine",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check public/app.js && node --check public/core.js",
+    "dev": "npx serve public -l 4173"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0"
+  }
+}

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f4efe6" />
+  <meta name="description" content="사진과 글로 만드는 공유형 뉴스레터 웹진" />
+  <title>Letterly — 나만의 뉴스레터 웹진</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="Letterly 홈"><span>LETTERLY</span><small>STORIES WORTH SHARING</small></a>
+    <nav><button class="text-btn" id="archiveBtn">지난 레터</button><button class="primary small" id="newBtn">새 레터 쓰기</button></nav>
+  </header>
+
+  <main>
+    <section class="hero" id="hero">
+      <p class="eyebrow">YOUR STORY, BEAUTIFULLY TOLD</p>
+      <h1>한 장의 사진과 한 편의 글,<br><em>오래 남는 웹진</em>이 됩니다.</h1>
+      <p>글을 쓰고 이미지를 더해 나만의 뉴스레터를 발행하세요.<br>생성된 링크 하나로 누구에게나 아름답게 공유할 수 있습니다.</p>
+      <button class="primary" id="heroWriteBtn">첫 뉴스레터 만들기 <span>→</span></button>
+    </section>
+
+    <section class="section" id="archive">
+      <div class="section-head"><div><p class="eyebrow">THE ARCHIVE</p><h2>지난 뉴스레터</h2></div><label class="search"><span>⌕</span><input id="searchInput" placeholder="제목과 내용 검색" /></label></div>
+      <div id="newsletterGrid" class="grid"></div>
+      <div id="emptyState" class="empty"><span>✦</span><h3>아직 발행된 레터가 없습니다</h3><p>첫 이야기를 만들어 독자에게 공유해 보세요.</p><button class="secondary" id="emptyWriteBtn">새 레터 쓰기</button></div>
+    </section>
+  </main>
+
+  <dialog id="editorDialog">
+    <form id="editorForm" method="dialog">
+      <header><div><p class="eyebrow">EDITOR</p><h2 id="editorTitle">새 레터 만들기</h2></div><button type="button" class="icon-btn" data-close aria-label="닫기">×</button></header>
+      <div class="form-grid">
+        <div class="fields">
+          <label>제목 <input id="titleInput" maxlength="80" required placeholder="독자의 시선을 끄는 제목" /></label>
+          <label>한 줄 소개 <input id="summaryInput" maxlength="150" placeholder="목록에 보일 짧은 소개" /></label>
+          <label>본문 <textarea id="contentInput" required rows="12" placeholder="전하고 싶은 이야기를 자유롭게 써보세요. 줄바꿈도 그대로 반영됩니다."></textarea></label>
+          <div class="row"><label>발행일 <input id="dateInput" type="date" required /></label><label class="check"><input id="featuredInput" type="checkbox" /><span>중요 레터로 상단 고정</span></label></div>
+        </div>
+        <div><span class="label">대표 이미지</span><button type="button" class="upload" id="uploadBtn"><input id="imageInput" type="file" accept="image/*" tabindex="-1" /><img id="imagePreview" alt="업로드 이미지 미리보기" /><span id="uploadPrompt"><b>사진 추가하기</b><small>JPG, PNG, WEBP · 공유에 맞게 자동 압축</small></span></button><button type="button" class="remove-image" id="removeImageBtn">이미지 제거</button></div>
+      </div>
+      <footer><button type="button" class="text-btn" data-close>취소</button><button class="primary" id="publishBtn" value="default">발행하고 링크 만들기</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="readerDialog" class="reader-dialog"><article id="readerArticle"></article></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <footer class="site-footer"><div class="brand"><span>LETTERLY</span><small>STORIES WORTH SHARING</small></div><p>당신의 이야기가 더 멀리, 더 오래 닿도록.</p></footer>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
