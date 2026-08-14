@@ -1,16 +1,54 @@
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
+export function normalizeManuscript(value = '') {
+  return String(value)
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function cleanTitle(value = '') {
+  return value.replace(/^#{1,6}\s*/, '').replace(/^(제목|title)\s*[:：]\s*/i, '').trim();
+}
+
+function shorten(value, max) {
+  if (value.length <= max) return value;
+  const cut = value.slice(0, max);
+  const boundary = Math.max(cut.lastIndexOf('.'), cut.lastIndexOf(' '));
+  return `${cut.slice(0, boundary > max * .55 ? boundary + 1 : max).trim()}…`;
+}
+
+export function autoCompose(raw) {
+  const manuscript = normalizeManuscript(raw);
+  if (!manuscript) throw new Error('자동 편집할 글을 입력하거나 원고 파일을 첨부해 주세요.');
+  const paragraphs = manuscript.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
+  const lines = manuscript.split('\n').map((line) => line.trim()).filter(Boolean);
+  const explicitTitle = lines[0]?.match(/^#{1,6}\s+.+/) || lines[0]?.match(/^(제목|title)\s*[:：]/i);
+  const firstLine = cleanTitle(lines[0] || '새로운 이야기');
+  const title = shorten(explicitTitle ? firstLine : firstLine.replace(/[.!?。]$/, ''), 55);
+  const bodyParagraphs = explicitTitle ? paragraphs.filter((_, index) => index > 0) : paragraphs;
+  const summarySource = bodyParagraphs.find((part) => cleanTitle(part) !== title) || lines.slice(1).join(' ') || firstLine;
+  const content = normalizeManuscript((explicitTitle ? paragraphs.slice(1) : paragraphs).join('\n\n')) || firstLine;
+  return { title, summary: shorten(summarySource.replace(/\n/g, ' '), 105), content };
+}
+
 export function createNewsletter(input) {
   const title = (input.title || '').trim();
   const content = (input.content || '').trim();
   if (!title || !content) throw new Error('제목과 본문을 입력해 주세요.');
+  const images = Array.isArray(input.images) ? input.images.filter(Boolean) : (input.image ? [input.image] : []);
   return {
     id: input.id || crypto.randomUUID(),
     title,
     summary: (input.summary || '').trim(),
     content,
-    image: input.image || '',
+    image: images[0] || '',
+    images,
+    layout: input.layout || (images.length > 2 ? 'editorial' : 'classic'),
     featured: Boolean(input.featured),
     publishedAt: input.publishedAt || new Date().toISOString().slice(0, 10),
     updatedAt: new Date().toISOString(),

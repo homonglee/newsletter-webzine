@@ -1,128 +1,18 @@
-import { createNewsletter, encodeNewsletter, decodeNewsletter, sortNewsletters, updateNewsletter, removeNewsletter } from './core.js';
-
-const STORAGE_KEY = 'letterly-newsletters-v1';
-const $ = (selector) => document.querySelector(selector);
-const grid = $('#newsletterGrid');
-const empty = $('#emptyState');
-const editor = $('#editorDialog');
-const reader = $('#readerDialog');
-const form = $('#editorForm');
-let items = loadItems();
-let editingId = null;
-let currentImage = '';
-
-function loadItems() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
-}
-function saveItems() { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }
-function escapeHTML(value = '') { return value.replace(/[&<>'"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
-function formatDate(date) { return new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date(`${date}T12:00:00`)); }
-function showToast(message) { const toast = $('#toast'); toast.textContent = message; toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2400); }
-
-function render() {
-  const query = $('#searchInput').value.trim().toLowerCase();
-  const visible = sortNewsletters(items).filter((item) => `${item.title} ${item.summary} ${item.content}`.toLowerCase().includes(query));
-  grid.innerHTML = visible.map((item) => `<article class="card" data-id="${item.id}">
-    <button class="cover ${item.image ? '' : 'placeholder'}" data-action="read" aria-label="${escapeHTML(item.title)} 읽기">${item.image ? `<img src="${item.image}" alt="" />` : escapeHTML(item.title.slice(0, 10))}</button>
-    <div class="card-body"><div class="meta"><time>${formatDate(item.publishedAt)}</time>${item.featured ? '<span class="pin">◆ IMPORTANT</span>' : ''}</div>
-      <h3>${escapeHTML(item.title)}</h3><p>${escapeHTML(item.summary || item.content.slice(0, 85))}</p>
-      <div class="actions"><button data-action="read">읽기 →</button><button data-action="share">링크 복사</button><button data-action="edit">편집</button><button data-action="delete">삭제</button></div>
-    </div></article>`).join('');
-  empty.hidden = items.length > 0 || query.length > 0;
-  grid.hidden = visible.length === 0;
-}
-
-function openEditor(item = null) {
-  editingId = item?.id || null;
-  currentImage = item?.image || '';
-  $('#editorTitle').textContent = item ? '레터 편집하기' : '새 레터 만들기';
-  $('#publishBtn').textContent = item ? '수정 내용 저장하기' : '발행하고 링크 만들기';
-  $('#titleInput').value = item?.title || '';
-  $('#summaryInput').value = item?.summary || '';
-  $('#contentInput').value = item?.content || '';
-  $('#dateInput').value = item?.publishedAt || new Date().toISOString().slice(0, 10);
-  $('#featuredInput').checked = Boolean(item?.featured);
-  updateImagePreview();
-  editor.showModal();
-  setTimeout(() => $('#titleInput').focus(), 80);
-}
-function updateImagePreview() {
-  $('#imagePreview').src = currentImage;
-  $('#imagePreview').style.display = currentImage ? 'block' : 'none';
-  $('#uploadPrompt').style.display = currentImage ? 'none' : 'flex';
-  $('#removeImageBtn').style.display = currentImage ? 'block' : 'none';
-}
-async function compressImage(file) {
-  const bitmap = await createImageBitmap(file);
-  const max = 1280;
-  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  const quality = file.size > 2_000_000 ? .7 : .8;
-  return canvas.toDataURL('image/webp', quality);
-}
-
-async function buildShareUrl(item) {
-  const payload = await encodeNewsletter(item);
-  const url = new URL(location.origin + location.pathname);
-  url.searchParams.set('letter', payload);
-  return url.href;
-}
-async function copyShare(item) {
-  const url = await buildShareUrl(item);
-  try { await navigator.clipboard.writeText(url); } catch {
-    const area = Object.assign(document.createElement('textarea'), { value: url });
-    area.style.position = 'fixed'; area.style.opacity = '0'; document.body.append(area); area.select(); document.execCommand('copy'); area.remove();
-  }
-  showToast('공유 링크를 복사했습니다.');
-}
-function openReader(item, shared = false) {
-  reader.innerHTML = `<article id="readerArticle"><button class="icon-btn reader-close" aria-label="닫기">×</button>
-    ${item.image ? `<div class="reader-hero"><img src="${item.image}" alt="${escapeHTML(item.title)}" /></div>` : ''}
-    <div class="reader-copy"><time>${formatDate(item.publishedAt)}</time>${item.featured ? ' · <span class="pin">IMPORTANT</span>' : ''}
-      <h1>${escapeHTML(item.title)}</h1>${item.summary ? `<p class="lead">${escapeHTML(item.summary)}</p>` : ''}<div class="body">${escapeHTML(item.content)}</div>
-      <div class="reader-tools"><button class="primary" id="readerShare">링크 복사</button>${shared ? '<a class="secondary" href="./">Letterly에서 나도 만들기</a>' : ''}</div></div></article>`;
-  reader.querySelector('.reader-close').onclick = () => reader.close();
-  reader.querySelector('#readerShare').onclick = () => copyShare(item);
-  reader.showModal();
-}
-
-form.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  try {
-    const next = createNewsletter({ id: editingId, title: $('#titleInput').value, summary: $('#summaryInput').value, content: $('#contentInput').value, publishedAt: $('#dateInput').value, featured: $('#featuredInput').checked, image: currentImage });
-    if (editingId) items = updateNewsletter(items, editingId, next); else items = [next, ...items];
-    saveItems(); render(); editor.close();
-    if (!editingId) { await copyShare(next); openReader(next); } else showToast('뉴스레터를 수정했습니다.');
-  } catch (error) { showToast(error.message); }
-});
-
-grid.addEventListener('click', async (event) => {
-  const button = event.target.closest('[data-action]'); if (!button) return;
-  const item = items.find((x) => x.id === button.closest('.card').dataset.id); if (!item) return;
-  const action = button.dataset.action;
-  if (action === 'read') openReader(item);
-  if (action === 'share') await copyShare(item);
-  if (action === 'edit') openEditor(item);
-  if (action === 'delete') {
-    if (!confirm(`“${item.title}” 뉴스레터를 삭제할까요?\n이 브라우저의 아카이브에서 제거되며 되돌릴 수 없습니다.`)) return;
-    items = removeNewsletter(items, item.id); saveItems(); render(); showToast('뉴스레터를 삭제했습니다.');
-  }
-});
-
-['#newBtn','#heroWriteBtn','#emptyWriteBtn'].forEach((s) => $(s).onclick = () => openEditor());
-$('#archiveBtn').onclick = () => $('#archive').scrollIntoView();
-$('#searchInput').addEventListener('input', render);
-document.querySelectorAll('[data-close]').forEach((el) => el.onclick = () => editor.close());
-$('#uploadBtn').onclick = (e) => { if (e.target !== $('#imageInput')) $('#imageInput').click(); };
-$('#imageInput').onchange = async (event) => { const file = event.target.files[0]; if (!file) return; showToast('이미지를 최적화하고 있습니다…'); currentImage = await compressImage(file); updateImagePreview(); event.target.value = ''; };
-$('#removeImageBtn').onclick = () => { currentImage = ''; updateImagePreview(); };
-[editor, reader].forEach((dialog) => dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); }));
-
-async function loadSharedLetter() {
-  const payload = new URL(location.href).searchParams.get('letter');
-  if (!payload) return;
-  try { const item = await decodeNewsletter(payload); openReader(item, true); } catch { showToast('공유 링크를 읽을 수 없습니다.'); }
-}
-render(); loadSharedLetter();
+import { createNewsletter, autoCompose, encodeNewsletter, decodeNewsletter, sortNewsletters, updateNewsletter, removeNewsletter } from './core.js';
+const STORAGE_KEY='letterly-newsletters-v1',MAX_IMAGES=8,$=(s)=>document.querySelector(s),grid=$('#newsletterGrid'),empty=$('#emptyState'),editor=$('#editorDialog'),reader=$('#readerDialog'),form=$('#editorForm');
+let items=loadItems(),editingId=null,currentImages=[];
+function loadItems(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')}catch{return[]}}function saveItems(){localStorage.setItem(STORAGE_KEY,JSON.stringify(items))}function escapeHTML(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}function formatDate(d){return new Intl.DateTimeFormat('ko-KR',{year:'numeric',month:'long',day:'numeric'}).format(new Date(`${d}T12:00:00`))}function showToast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2400)}
+function getImages(item){return item.images?.length?item.images:(item.image?[item.image]:[])}
+function render(){const q=$('#searchInput').value.trim().toLowerCase(),visible=sortNewsletters(items).filter(x=>`${x.title} ${x.summary} ${x.content}`.toLowerCase().includes(q));grid.innerHTML=visible.map(item=>{const images=getImages(item);return `<article class="card" data-id="${item.id}"><button class="cover ${images[0]?'':'placeholder'}" data-action="read" aria-label="${escapeHTML(item.title)} 읽기">${images.length>1?`<span class="photo-count">사진 ${images.length}장</span>`:''}${images[0]?`<img src="${images[0]}" alt="">`:escapeHTML(item.title.slice(0,10))}</button><div class="card-body"><div class="meta"><time>${formatDate(item.publishedAt)}</time>${item.featured?'<span class="pin">◆ IMPORTANT</span>':''}</div><h3>${escapeHTML(item.title)}</h3><p>${escapeHTML(item.summary||item.content.slice(0,85))}</p><div class="actions"><button data-action="read">읽기 →</button><button data-action="share">링크 복사</button><button data-action="edit">편집</button><button data-action="delete">삭제</button></div></div></article>`}).join('');empty.hidden=items.length>0||q.length>0;grid.hidden=visible.length===0}
+function openEditor(item=null){editingId=item?.id||null;currentImages=getImages(item||{});editor.classList.toggle('result-mode',Boolean(item));$('#editorTitle').textContent=item?'레터 편집하기':'자동 뉴스레터 만들기';$('#publishBtn').textContent=item?'수정 내용 저장하기':'발행하고 링크 만들기';$('#publishBtn').disabled=!item;$('#manuscriptInput').value=item?.content||'';$('#titleInput').value=item?.title||'';$('#summaryInput').value=item?.summary||'';$('#contentInput').value=item?.content||'';$('#dateInput').value=item?.publishedAt||new Date().toISOString().slice(0,10);$('#featuredInput').checked=Boolean(item?.featured);$('#layoutSelect').value=item?.layout||'auto';$('#resultLayout').value=item?.layout||'editorial';$('#editorStatus').textContent=item?'수정 후 저장해 주세요.':'원고와 사진을 넣으면 자동으로 구성합니다.';renderImages();editor.showModal();setTimeout(()=>item?$('#titleInput').focus():$('#manuscriptInput').focus(),80)}
+async function compressImage(file){const bitmap=await createImageBitmap(file),max=1280,scale=Math.min(1,max/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);return canvas.toDataURL('image/webp',file.size>2e6?.66:.76)}
+function renderImages(){$('#imageStrip').innerHTML=currentImages.map((src,i)=>`<div class="thumb" data-index="${i}"><img src="${src}" alt="사진 ${i+1}"><span>${i+1}</span><div><button type="button" data-move="-1" aria-label="앞으로">←</button><button type="button" data-move="1" aria-label="뒤로">→</button><button type="button" data-remove aria-label="삭제">×</button></div></div>`).join('');$('#resultImages').innerHTML=currentImages.map((src,i)=>`<img src="${src}" alt="배치 사진 ${i+1}">`).join('')}
+async function addImages(files){const accepted=[...files].filter(f=>f.type.startsWith('image/')).slice(0,MAX_IMAGES-currentImages.length);if(!accepted.length)return showToast(currentImages.length>=MAX_IMAGES?'사진은 최대 8장까지 가능합니다.':'이미지 파일을 선택해 주세요.');$('#editorStatus').textContent=`사진 ${accepted.length}장을 최적화하고 있습니다…`;for(const file of accepted)currentImages.push(await compressImage(file));renderImages();$('#editorStatus').textContent=`사진 ${currentImages.length}장이 자동 배치됩니다.`}
+function chooseLayout(){const requested=$('#layoutSelect').value;if(requested!=='auto')return requested;return currentImages.length>=3?'editorial':currentImages.length===2?'gallery':'classic'}
+function generateDraft(){try{const draft=autoCompose($('#manuscriptInput').value);$('#titleInput').value=draft.title;$('#summaryInput').value=draft.summary;$('#contentInput').value=draft.content;$('#resultLayout').value=chooseLayout();editor.classList.add('result-mode');$('#publishBtn').disabled=false;$('#editorStatus').textContent=`자동 편집 완료 · 사진 ${currentImages.length}장 · 발행 전 수정 가능`;renderImages();showToast('자동 편집 초안을 완성했습니다.')}catch(e){showToast(e.message)}}
+async function buildShareUrl(item){const url=new URL(location.origin+location.pathname);url.searchParams.set('letter',await encodeNewsletter(item));return url.href}async function copyShare(item){const url=await buildShareUrl(item);try{await navigator.clipboard.writeText(url)}catch{const a=Object.assign(document.createElement('textarea'),{value:url});a.style.position='fixed';a.style.opacity='0';document.body.append(a);a.select();document.execCommand('copy');a.remove()}showToast('공유 링크를 복사했습니다.')}
+function openReader(item,shared=false){const images=getImages(item),layout=item.layout||'editorial';reader.innerHTML=`<article id="readerArticle"><button class="icon-btn reader-close" aria-label="닫기">×</button>${images[0]?`<div class="reader-hero"><img src="${images[0]}" alt="${escapeHTML(item.title)}"></div>`:''}<div class="reader-copy"><time>${formatDate(item.publishedAt)}</time>${item.featured?' · <span class="pin">IMPORTANT</span>':''}<h1>${escapeHTML(item.title)}</h1>${item.summary?`<p class="lead">${escapeHTML(item.summary)}</p>`:''}<div class="body">${escapeHTML(item.content)}</div><div class="reader-tools"><button class="primary" id="readerShare">링크 복사</button>${shared?'<a class="secondary" href="./">Letterly에서 나도 만들기</a>':''}</div></div>${images.length>1?`<div class="story-gallery ${layout}">${images.map((src,i)=>`<img src="${src}" alt="${escapeHTML(item.title)} 사진 ${i+1}">`).join('')}</div>`:''}</article>`;reader.querySelector('.reader-close').onclick=()=>reader.close();reader.querySelector('#readerShare').onclick=()=>copyShare(item);reader.showModal()}
+form.addEventListener('submit',async e=>{e.preventDefault();try{const next=createNewsletter({id:editingId,title:$('#titleInput').value,summary:$('#summaryInput').value,content:$('#contentInput').value,publishedAt:$('#dateInput').value,featured:$('#featuredInput').checked,images:currentImages,layout:$('#resultLayout').value});items=editingId?updateNewsletter(items,editingId,next):[next,...items];saveItems();render();editor.close();if(!editingId){await copyShare(next);openReader(next)}else showToast('뉴스레터를 수정했습니다.')}catch(err){showToast(err.message)}});
+grid.addEventListener('click',async e=>{const b=e.target.closest('[data-action]');if(!b)return;const item=items.find(x=>x.id===b.closest('.card').dataset.id);if(b.dataset.action==='read')openReader(item);if(b.dataset.action==='share')await copyShare(item);if(b.dataset.action==='edit')openEditor(item);if(b.dataset.action==='delete'&&confirm(`“${item.title}” 뉴스레터를 삭제할까요?\n이 브라우저의 아카이브에서 제거되며 되돌릴 수 없습니다.`)){items=removeNewsletter(items,item.id);saveItems();render();showToast('뉴스레터를 삭제했습니다.')}});
+$('#imageStrip').addEventListener('click',e=>{const thumb=e.target.closest('.thumb');if(!thumb)return;const i=Number(thumb.dataset.index);if(e.target.closest('[data-remove]'))currentImages.splice(i,1);else if(e.target.closest('[data-move]')){const j=i+Number(e.target.closest('[data-move]').dataset.move);if(j>=0&&j<currentImages.length)[currentImages[i],currentImages[j]]=[currentImages[j],currentImages[i]]}renderImages()});
+['#newBtn','#heroWriteBtn','#emptyWriteBtn'].forEach(s=>$(s).onclick=()=>openEditor());$('#archiveBtn').onclick=()=>$('#archive').scrollIntoView();$('#searchInput').addEventListener('input',render);document.querySelectorAll('[data-close]').forEach(el=>el.onclick=()=>editor.close());$('#textFileBtn').onclick=e=>{if(e.target!==$('#textFileInput'))$('#textFileInput').click()};$('#textFileInput').onchange=async e=>{const file=e.target.files[0];if(!file)return;$('#manuscriptInput').value=await file.text();$('#fileName').textContent=file.name;e.target.value=''};$('#imagePickBtn').onclick=()=>$('#imageInput').click();$('#multiUpload').onclick=e=>{if(!e.target.closest('button'))$('#imageInput').click()};$('#imageInput').onchange=async e=>{await addImages(e.target.files);e.target.value=''};$('#generateBtn').onclick=generateDraft;$('#backToSource').onclick=()=>editor.classList.remove('result-mode');[editor,reader].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));async function loadSharedLetter(){const p=new URL(location.href).searchParams.get('letter');if(p)try{openReader(await decodeNewsletter(p),true)}catch{showToast('공유 링크를 읽을 수 없습니다.')}}render();loadSharedLetter();

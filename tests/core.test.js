@@ -7,6 +7,8 @@ import {
   sortNewsletters,
   updateNewsletter,
   removeNewsletter,
+  autoCompose,
+  normalizeManuscript,
 } from '../public/core.js';
 
 test('뉴스레터를 생성하고 공유 문자열로 왕복 복원한다', async () => {
@@ -41,4 +43,22 @@ test('편집은 지정한 글만 바꾸고 삭제는 지정한 글만 제거한�
 
 test('제목과 본문이 없으면 생성할 수 없다', () => {
   assert.throws(() => createNewsletter({ title: '', content: '' }), /제목과 본문/);
+});
+
+test('원고의 첫 제목과 문단을 분석해 제목과 소개를 자동 구성한다', () => {
+  const result = autoCompose(`# AI가 바꾸는 CEO의 하루\n\n인공지능은 이제 실험을 넘어 경영의 도구가 되었습니다. 조직은 질문하는 방식을 다시 설계해야 합니다.\n\n첫째, 반복 업무를 찾아야 합니다.\n\n둘째, 사람이 판단할 지점을 분명히 해야 합니다.`);
+  assert.equal(result.title, 'AI가 바꾸는 CEO의 하루');
+  assert.match(result.summary, /인공지능은 이제 실험을 넘어/);
+  assert.match(result.content, /첫째, 반복 업무/);
+});
+
+test('제목 표시와 불필요한 공백을 정리한다', () => {
+  assert.equal(normalizeManuscript('  제목: 새로운 시작  \n\n\n  첫 문단입니다.  '), '제목: 새로운 시작\n\n첫 문단입니다.');
+});
+
+test('여러 이미지와 자동 레이아웃 정보를 뉴스레터에 보존한다', () => {
+  const item = createNewsletter({ title: '사진 이야기', content: '본문', images: ['one', 'two'], layout: 'editorial' });
+  assert.deepEqual(item.images, ['one', 'two']);
+  assert.equal(item.image, 'one');
+  assert.equal(item.layout, 'editorial');
 });
