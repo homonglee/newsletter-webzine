@@ -72,6 +72,27 @@ export function renderMarkdown(value = '') {
   return html.join('');
 }
 
+export function newsletterFilename(title = '') {
+  const safe = String(title).normalize('NFKC').replace(/[\\/?%*:|"<>]/g, '-').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 80);
+  return `${safe || 'newsletter'}.html`;
+}
+
+export function renderStandaloneNewsletter(item = {}) {
+  const title = escapeHTML(item.title || '뉴스레터');
+  const summary = escapeHTML(item.summary || '');
+  const date = escapeHTML(item.publishedAt || '');
+  const images = (Array.isArray(item.images) ? item.images : (item.image ? [item.image] : []))
+    .filter((src) => /^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(src));
+  const layout = ['editorial', 'gallery', 'classic'].includes(item.layout) ? item.layout : 'classic';
+  const imageHTML = images[0] ? `<figure class="hero-image"><img src="${images[0]}" alt="${title}"></figure>` : '';
+  const galleryHTML = images.length > 1 ? `<section class="gallery ${layout}" aria-label="뉴스레터 사진">${images.slice(1).map((src, index) => `<img src="${src}" alt="${title} 사진 ${index + 2}">`).join('')}</section>` : '';
+  return `<!doctype html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="${summary}"><title>${title}</title>
+<style>
+:root{--ink:#211f1c;--muted:#716c64;--paper:#f7f3eb;--accent:#b74b32;--line:#d7cec0}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:Arial,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}.newsletter{min-height:100vh;padding:clamp(24px,6vw,72px) 22px}.column{max-width:630px;margin:auto}.hero-image{margin:0 auto clamp(38px,6vw,70px);max-width:630px}.hero-image img,.gallery img{display:block;width:100%;height:auto}.date{color:var(--accent);font-size:14px;font-weight:700}.title{margin:16px 0;font-family:Georgia,"AppleMyungjo","Noto Serif KR",serif;font-size:clamp(34px,7vw,58px);line-height:1.3}.lead{margin:25px 0 42px;border-left:3px solid var(--accent);padding-left:18px;color:var(--muted);font-size:19px;line-height:1.75}.body{font-family:Georgia,"AppleMyungjo","Noto Serif KR",serif;font-size:17px;line-height:2}.body p{margin:0 0 1.65em}.body h2{margin:2.2em 0 .8em;padding-top:.7em;border-top:1px solid var(--line);font-size:28px}.body h3{margin:1.9em 0 .7em;font-size:22px}.body ul,.body ol{margin:1.2em 0 1.8em;padding:1.25em 1.4em 1.25em 2.8em;background:#efe8dd}.body blockquote{margin:2em 0;padding:1.1em 1.4em;border-left:4px solid var(--accent);background:#f0e7da;color:#554d43;font-size:19px;font-style:italic}.body strong{color:#8f3827}.body code{background:#ebe3d7;padding:.15em .4em}.body hr{border:0;border-top:1px solid var(--line);width:35%;margin:3em auto}.gallery{max-width:900px;margin:65px auto 0;display:grid;gap:20px}.gallery.editorial,.gallery.gallery{grid-template-columns:repeat(2,1fr)}.gallery.classic{grid-template-columns:1fr}.footer{max-width:630px;margin:70px auto 0;padding-top:22px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}@media(max-width:560px){.newsletter{padding-left:22px;padding-right:22px}.gallery.editorial,.gallery.gallery{grid-template-columns:1fr}}@media print{body{background:#fff}.newsletter{padding-top:20px}.footer{display:none}}
+</style></head><body><article class="newsletter">${imageHTML}<header class="column">${date ? `<time class="date">${date}</time>` : ''}<h1 class="title">${title}</h1>${summary ? `<p class="lead">${summary}</p>` : ''}</header><main class="column body">${renderMarkdown(item.content || '')}</main>${galleryHTML}<footer class="footer">호몽의 News Letter</footer></article></body></html>`;
+}
+
 export function autoCompose(raw, options = {}) {
   const manuscript = normalizeManuscript(raw);
   if (!manuscript) throw new Error('자동 편집할 글을 입력하거나 원고 파일을 첨부해 주세요.');

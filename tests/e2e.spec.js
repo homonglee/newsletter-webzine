@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 
 const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:4173';
 const IS_LOCAL = ['127.0.0.1', 'localhost'].includes(new URL(BASE_URL).hostname);
@@ -52,6 +53,21 @@ test('원고 자동 편집, 고정, 짧은 공유 링크, 편집, 삭제 흐름'
   expect(Math.abs(desktopImage.imageWidth - desktopImage.bodyWidth)).toBeLessThan(1);
   expect(Math.abs(desktopImage.imageX - desktopImage.bodyX)).toBeLessThan(1);
   console.log(`desktop-layout image=${desktopImage.imageWidth.toFixed(2)}px body=${desktopImage.bodyWidth.toFixed(2)}px x=${desktopImage.imageX.toFixed(2)}/${desktopImage.bodyX.toFixed(2)}`);
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#readerDownload').click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('AI-시대의-리더십.html');
+  const downloadedHTML = await readFile(await download.path(), 'utf8');
+  expect(downloadedHTML).toMatch(/^<!doctype html>/i);
+  expect(downloadedHTML).toContain('변화를 이끄는 리더의 세 가지 질문을 소개합니다.');
+  expect(downloadedHTML).toContain('<h2>핵심 질문</h2>');
+  expect(downloadedHTML.match(/data:image\/webp;base64,/g)).toHaveLength(3);
+  expect(downloadedHTML).not.toMatch(/<script(?:\s|>)/i);
+  const offlinePage = await context.newPage();
+  await offlinePage.setContent(downloadedHTML, { waitUntil: 'load' });
+  await expect(offlinePage.getByRole('heading', { name: 'AI 시대의 리더십', level: 1 })).toBeVisible();
+  await expect(offlinePage.locator('img')).toHaveCount(3);
+  await offlinePage.close();
   const shareUrl = await page.evaluate(() => navigator.clipboard.readText());
   const parsedShareUrl = new URL(shareUrl);
   expect(parsedShareUrl.pathname).toMatch(/^\/newsletter\/s\/[A-Za-z0-9_-]{8}$/);

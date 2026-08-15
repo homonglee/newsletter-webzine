@@ -11,6 +11,8 @@ import {
   normalizeManuscript,
   formatTextAsMarkdown,
   renderMarkdown,
+  renderStandaloneNewsletter,
+  newsletterFilename,
 } from '../public/core.js';
 
 test('뉴스레터를 생성하고 공유 문자열로 왕복 복원한다', async () => {
@@ -96,4 +98,28 @@ test('Markdown을 안전한 웹진 HTML로 렌더링한다', () => {
   assert.match(html, /<ul><li>첫 번째<\/li><li>두 번째<\/li><\/ul>/);
   assert.doesNotMatch(html, /<script>/);
   assert.match(html, /&lt;script&gt;/);
+});
+
+test('뉴스레터를 이미지와 스타일이 포함된 안전한 독립 HTML로 만든다', () => {
+  const html = renderStandaloneNewsletter({
+    title: 'AI <script>alert(1)</script> 레터',
+    summary: '이번 주 핵심 소개',
+    content: '## 핵심 변화\n\n중요한 **질문**입니다.',
+    publishedAt: '2026-08-14',
+    images: ['data:image/webp;base64,AAAA', 'data:image/png;base64,BBBB'],
+    layout: 'editorial',
+  });
+  assert.match(html, /^<!doctype html>/i);
+  assert.match(html, /<style>[\s\S]+<\/style>/);
+  assert.match(html, /data:image\/webp;base64,AAAA/);
+  assert.match(html, /data:image\/png;base64,BBBB/);
+  assert.match(html, /<h2>핵심 변화<\/h2>/);
+  assert.match(html, /AI &lt;script&gt;alert\(1\)&lt;\/script&gt; 레터/);
+  assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/);
+  assert.doesNotMatch(html, /<script src=/);
+});
+
+test('HTML 다운로드 파일명에서 경로 문자를 제거한다', () => {
+  assert.equal(newsletterFilename('AI/리더십: 뉴스레터?'), 'AI-리더십-뉴스레터.html');
+  assert.equal(newsletterFilename(''), 'newsletter.html');
 });
